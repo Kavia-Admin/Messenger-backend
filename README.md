@@ -12,6 +12,16 @@ Mesibo Messenger is an open-source app with real-time messaging, voice and video
 - Online status (presence) and real-time profile update
 - Push notifications
 - **Edit and Delete Messages (only by sender, with real-time broadcast)**
+- Disappearing/Self-destructing messages (set expiry/TTL; can be scheduled to auto-delete)
+
+### Database Migration
+
+To enable disappearing messages, add expiry timestamp (expiry_ts INTEGER) to the messages table:
+
+```
+ALTER TABLE messages ADD COLUMN expiry_ts INTEGER NULL;
+-- expiry_ts: UNIX timestamp when the message expires; NULL = never expires
+```
 
 ### API Endpoints for Messaging control
 
@@ -22,6 +32,12 @@ Mesibo Messenger is an open-source app with real-time messaging, voice and video
   - **Params:** `from`, `message_id`
   - **Returns:** Result (success/error)
 - Real-time notifications for `message_edited` and `message_deleted` events should be handled by the client for UI sync.
+
+- `POST /?api=send_message`: Send a new message
+  - **Params:** `from`, `to`, `message`, `type`, `data`, `expiry` (optional, in seconds; e.g. 30, 300, 86400)
+  - **Returns:** Result, `message_id`, and `expires_in_seconds` if provided
+  - If expiry is set, the message is self-destructing and will disappear after expiry.
+  - On fetch, expired messages will not be present.
 
 ### Mesibo Android App Source Code
 [https://github.com/mesibo/messenger-app-android/](https://github.com/mesibo/messenger-app-android/).
@@ -46,5 +62,4 @@ There are many ways to contribute:
 
 - Fork the repository, make changes or add new content on your local
 branch, and submit a pull request (PR) to the master branch for the samples.
-
 

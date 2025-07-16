@@ -1,101 +1,51 @@
 <?php
-/********************************************************************************
- This File contains all functions necessary for sending a request using  Mesibo API's to perform
- the operations as mentioned in the documentation of the functions given below.
- 
- IMPORTANT: All functions are dependent on the Mesibo API function (mesiboapi.php).
-*********************************************************************************/
-require_once('mesiboapi.php');
 
-function MesiboOTP($address, $tries, $expiry, $reuse) {
-    
-	$parameters=array();
-	$parameters['op']='otp';
-	$parameters['addr']=$address;
-	$parameters['tries']=$tries;
-	$parameters['expiry']=$expiry;
-	$parameters['reuse']=$reuse;
-	return MesiboAPI($parameters);
+/**
+ * PUBLIC_INTERFACE
+ * Add a message to the database, with optional expiry time in seconds.
+ *
+ * @param string $from Sender
+ * @param string $to Recipient
+ * @param string $message Message text
+ * @param int $type Message type
+ * @param string $data Extra data
+ * @param int $status Message status
+ * @param int|null $expires_in_secs Optional seconds until expiry (NULL for no expiry)
+ * @return int Message ID
+ */
+function addMessage($from, $to, $message, $type, $data = '', $status = 0, $expires_in_secs = null) {
+    global $db;
+    $expiry = null;
+    if ($expires_in_secs !== null) {
+        $expiry = time() + intval($expires_in_secs);
+    }
+    $stmt = $db->prepare("INSERT INTO messages(`from`, `to`, `message`, `type`, `data`, `status`, `expiry_ts`) VALUES (?, ?, ?, ?, ?, ?, ?)");
+    $stmt->execute([$from, $to, $message, $type, $data, $status, $expiry]);
+    return $db->lastInsertId();
 }
 
-function MesiboAddUser($name, $address, $appid, $session, $expiry, $flag, $otp, $restrictions=0) {
-    
-	$parameters=array();
-	$parameters['op']='useradd';
-	$parameters['name']=$name;
-	$parameters['addr']=$address;
-	$parameters['appid']=$appid;
-	$parameters['session']=$session;
-	$parameters['expiry']=$expiry;
-	$parameters['flag']=$flag;
-	$parameters['otp']=$otp;
-	$parameters['restrictions']=$restrictions;
-	return MesiboAPI($parameters);
+/**
+ * PUBLIC_INTERFACE
+ * Remove expired messages from the database.
+ * Should be called periodically before message fetches.
+ */
+function removeExpiredMessages() {
+    global $db;
+    $now = time();
+    $stmt = $db->prepare("DELETE FROM messages WHERE expiry_ts IS NOT NULL AND expiry_ts <= ?");
+    $stmt->execute([$now]);
 }
 
-function MesiboDeleteUser($addr, $appid) {  
-    
-	$parameters=array();
-	$parameters['op']='deluser';
-	$parameters['addr']=$address;
-	$parameters['appid']=$appid;
-    
-	return MesiboAPI($parameters);
-}    
-
-function MesiboDeleteToken($token) {  
-    
-	$parameters=array();
-	$parameters['op']='deltoken';
-	$parameters['token']=$token;
-	return MesiboAPI($parameters);
-}    
-
-function MesiboSetGroup($groupid, $name, $flag, $members) {  
-	$parameters=array();
-	$parameters['gid']=$groupid;
-	$parameters['op']=$groupid?'groupset':'groupadd';
-	$parameters['name']=$name;
-	$parameters['flag']=$flag;
-	$parameters['m']=$members;
-	return MesiboAPI($parameters);
-}    
-
-function MesiboDeleteGroup($groupid) {  
-	$parameters=array();
-	$parameters['op']='groupdel';
-	$parameters['gid']=$groupid;
-	return MesiboAPI($parameters);
-}    
-
-function MesiboEditMembers($groupid, $members, $delete) {  
-	$parameters=array();
-	$parameters['op']='groupeditmembers';
-	$parameters['gid']=$groupid;
-	$parameters['m']=$members;
-	$parameters['delete']=$delete;
-	return MesiboAPI($parameters);
-}    
-
-function MesiboGetMembers($groupid) {  
-	$parameters=array();
-	$parameters['op']='getmembers';
-	$parameters['gid']=$groupid;
-	return MesiboAPI($parameters);
-}    
-
-function MesiboMessage($from, $to, $groupid, $channel, $type, $expiry, $flag, $message, $forced=0) {  
-	$parameters=array();
-	$parameters['op']='message';
-	$parameters['from']=$from;
-	$parameters['to']=$to;
-	$parameters['gid']=$groupid;
-	$parameters['channel']=$channel;
-	$parameters['type']=$type;
-	$parameters['expiry']=$expiry;
-	$parameters['flag']=$flag;
-	$parameters['forced']=$forced;
-	$parameters['msg']=$message;
-	return MesiboAPI($parameters);
-}    
-
+/**
+ * PUBLIC_INTERFACE
+ * Fetch messages for a conversation, hiding expired ones.
+ */
+function getMessages($user1, $user2, $limit = 50, $offset = 0) {
+    global $db;
+    removeExpiredMessages();
+    $now = time();
+    $stmt = $db->prepare("SELECT * FROM messages WHERE ((`from` = ? AND `to` = ?) OR (`from` = ? AND `to` = ?)) AND (expiry_ts IS NULL OR expiry_ts > ?) ORDER BY id DESC LIMIT ? OFFSET ?");
+    $stmt->execute([$user1, $user2, $user2, $user1, $now, $limit, $offset]);
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+?>
