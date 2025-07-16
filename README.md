@@ -11,6 +11,17 @@ Mesibo Messenger is an open-source app with real-time messaging, voice and video
 - Message status and typing indicators
 - Online status (presence) and real-time profile update
 - Push notifications
+- **Edit and Delete Messages (only by sender, with real-time broadcast)**
+
+### API Endpoints for Messaging control
+
+- `POST /?api=edit_message`: Edit a sent message (sender only)
+  - **Params:** `from`, `message_id`, `new_message`
+  - **Returns:** Result (success/error)
+- `POST /?api=delete_message`: Delete a sent message (sender only)
+  - **Params:** `from`, `message_id`
+  - **Returns:** Result (success/error)
+- Real-time notifications for `message_edited` and `message_deleted` events should be handled by the client for UI sync.
 
 ### Mesibo Android App Source Code
 [https://github.com/mesibo/messenger-app-android/](https://github.com/mesibo/messenger-app-android/).
