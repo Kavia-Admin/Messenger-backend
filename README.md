@@ -16,6 +16,26 @@ Mesibo Messenger is an open-source app with real-time messaging, voice and video
 
 ### Database Migration
 
+#### Message Reactions
+
+To support message reactions (such as likes, thumbs up, emoji, etc.), add a `message_reactions` table to record reactions to each message from individual users.
+
+**Example SQL:**
+```
+CREATE TABLE message_reactions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    message_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    reaction TEXT NOT NULL, -- e.g. 'like', 'smile', 'heart', emoji unicode
+    created_ts INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+    UNIQUE(message_id, user_id, reaction) -- Prevent duplicate reactions of the same type by same user
+);
+```
+- `message_id`: references the ID of a message.
+- `user_id`: the user who added the reaction.
+- `reaction`: the reaction itself (emoji or label).
+- `created_ts`: timestamp of reaction.
+
 To enable disappearing messages, add expiry timestamp (expiry_ts INTEGER) to the messages table:
 
 ```
@@ -24,6 +44,24 @@ ALTER TABLE messages ADD COLUMN expiry_ts INTEGER NULL;
 ```
 
 ### API Endpoints for Messaging control
+
+#### Message Reactions API
+
+- `POST /?api=add_reaction`: Add a reaction to a message
+  - **Params:** `from`, `message_id`, `reaction`
+  - **Returns:** `result` (success/error), details
+  - **Notes:** Only one unique reaction per type/user. Notifies all participants via real-time broadcast.
+
+- `POST /?api=remove_reaction`: Remove a reaction from a message
+  - **Params:** `from`, `message_id`, `reaction`
+  - **Returns:** `result` (success/error)
+  - **Notes:** Removes specific reaction by user on the message.
+
+- `GET /?api=get_reactions`: Get aggregated reactions for messages
+  - **Params:** `message_id` (or list, or for a chat)
+  - **Returns:** List of reactions per message, with users, counts, and types.
+
+- Real-time notifications for `reaction_added` and `reaction_removed` events should be handled by the client to update the message UI accordingly.
 
 - `POST /?api=edit_message`: Edit a sent message (sender only)
   - **Params:** `from`, `message_id`, `new_message`
