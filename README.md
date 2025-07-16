@@ -72,10 +72,21 @@ ALTER TABLE messages ADD COLUMN expiry_ts INTEGER NULL;
 - Real-time notifications for `message_edited` and `message_deleted` events should be handled by the client for UI sync.
 
 - `POST /?api=send_message`: Send a new message
-  - **Params:** `from`, `to`, `message`, `type`, `data`, `expiry` (optional, in seconds; e.g. 30, 300, 86400)
+  - **Params:**
+    - `from`: sender user ID
+    - `to`: recipient user ID or group ID
+    - `message`: the main message content (text, or may be empty for other types)
+    - `type`: message type (`text`, `image`, `audio`, `video`, `file`, `location`, `sticker`, `emoji`, `gif`)
+    - `data`: optional data for message type; required for `sticker`, `gif`, `emoji`:
+       - For `sticker`, pass the sticker identifier name, URL, or resource info
+       - For `gif`, pass the GIF URL or resource info
+       - For `emoji`, pass the emoji unicode (e.g. "😃")
+    - `expiry` (optional, in seconds; e.g. 30, 300, 86400)
   - **Returns:** Result, `message_id`, and `expires_in_seconds` if provided
   - If expiry is set, the message is self-destructing and will disappear after expiry.
   - On fetch, expired messages will not be present.
+  - **Stickers, GIF, Emoji**: Message types `sticker`, `gif`, or `emoji` must store and return their content via the `data` field. The client should interpret and render appropriately.
+  - **Clients must synchronize message display for these types as they do for regular media.**
 
 ### Mesibo Android App Source Code
 [https://github.com/mesibo/messenger-app-android/](https://github.com/mesibo/messenger-app-android/).

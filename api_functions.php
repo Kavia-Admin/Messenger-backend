@@ -104,10 +104,68 @@ function api_get_reactions($params) {
 }
 
 /**
+ * PUBLIC_INTERFACE
+ * Send a new message, supporting text, picture, video, audio, file, sticker, emoji, or gif.
+ * @param array $params [from, to, message, type, data, expiry]
+ * type: text|image|audio|video|file|location|sticker|emoji|gif
+ * For sticker/gif/emoji, the 'data' field contains sticker name or URL, gif URL, or emoji unicode.
+ */
+function send_message($params) {
+    global $db;
+
+    $from = isset($params['from']) ? trim($params['from']) : '';
+    $to = isset($params['to']) ? trim($params['to']) : '';
+    $message = isset($params['message']) ? trim($params['message']) : '';
+    $type = isset($params['type']) ? trim($params['type']) : 'text';
+    $data = isset($params['data']) ? trim($params['data']) : null;
+    $expiry = isset($params['expiry']) ? $params['expiry'] : null;
+
+    // For disappear msg
+    $expiry_ts = null;
+    if ($expiry !== null && is_numeric($expiry)) {
+        $expiry_ts = time() + intval($expiry);
+    }
+
+    // For sticker/gif/emoji: data is required
+    if (in_array($type, ['sticker', 'gif', 'emoji'])) {
+        if (!$data) {
+            return ['result' => 'error', 'error' => 'Data field required for sticker/gif/emoji'];
+        }
+        // For sticker and gif, message text may be empty
+        if ($type == 'emoji') {
+            // emoji unicode stored in data, message can be blank
+        }
+    }
+
+    // You may need to sanitize/validate $to here...
+
+    try {
+        $sql = "INSERT INTO messages (sender, receiver, message, type, data, expiry_ts, created_ts)
+                VALUES (?, ?, ?, ?, ?, ?, strftime('%s', 'now'))";
+        $stmt = $db->prepare($sql);
+        $stmt->execute([$from, $to, $message, $type, $data, $expiry_ts]);
+        $message_id = $db->lastInsertId();
+        
+        // Optionally broadcast to recipients here (for real-time chat)
+        // broadcast_new_message($message_id, $from, $to, $type, $message, $data);
+        
+        return [
+            'result' => 'success',
+            'message_id' => $message_id,
+            'expires_in_seconds' => $expiry !== null ? intval($expiry) : null
+        ];
+    } catch (Exception $e) {
+        return ['result' => 'error', 'error' => $e->getMessage()];
+    }
+}
+
+/**
  * Internal function to broadcast real-time reaction updates.
  */
 function broadcast_reaction_event($event, $message_id, $user_id, $reaction) {
     // Implement your real-time notification system here.
     // Placeholder only.
 }
+
+// Implement additional functions as needed for your API.
 ?>
